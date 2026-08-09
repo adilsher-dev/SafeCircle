@@ -1,0 +1,28 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Java / Spring Boot
+backend/target/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Node / React
+safecircle/node_modules/
+safecircle/dist/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local configuration
+application-local.properties
+#application-local.yml
