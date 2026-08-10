@@ -1,10 +1,9 @@
 spring:
-
   application:
     name: SafeCircle Backend
 
   datasource:
-    url:  ${DB_URL:jdbc:postgresql://localhost:5432/safecircle}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/safecircle}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
@@ -12,9 +11,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-
     show-sql: true
-
     properties:
       hibernate:
         format_sql: true
@@ -22,13 +19,13 @@ spring:
 
   jackson:
     serialization:
-      INDENT_OUTPUT: true
+      indent_output: true
 
 server:
   port: ${PORT:8080}
 
 jwt:
-  secret:  ${JWT_SECRET}
+  secret: ${JWT_SECRET}
   expiration: 86400000
 
 logging:
