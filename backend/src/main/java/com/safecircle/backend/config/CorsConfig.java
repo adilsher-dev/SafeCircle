@@ -33,14 +33,17 @@ public class CorsConfig {
         configuration.setAllowedHeaders(List.of(
                 "Authorization",
                 "Content-Type",
-                "Accept"
+                "Accept",
+                "Origin"
         ));
 
         configuration.setExposedHeaders(List.of(
                 "Authorization"
         ));
 
-        configuration.setAllowCredentials(false);
+        // Keep this true because the deployed frontend may make credentialed
+        // browser requests. The allowed origins above are explicit, not '*'.
+        configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();

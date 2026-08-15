@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ShieldAlert, Phone, Heart, Car, Siren, X, MapPin } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -12,7 +12,8 @@ import { useFetchOnMount } from '@/hooks/useAsync';
 import { emergencyApi, journeyApi } from '@/api';
 import { extractErrorMessage } from '@/api/client';
 import { formatDate } from '@/utils/format';
-import type { AlertType } from '@/types';
+import type { AlertMessage, AlertType } from '@/types';
+import { socketService, wsTopics } from '@/services/socketService';
 
 const sosTypes: Array<{ type: AlertType; label: string; icon: React.ReactNode }> = [
   { type: 'SOS', label: 'General SOS', icon: <ShieldAlert className="h-5 w-5" /> },
@@ -34,6 +35,25 @@ export default function SosCenterPage() {
 
   const activeJourney = journeys.find((j) => j.status === 'STARTED' || j.status === 'IN_PROGRESS');
   const activeSOS = useMemo(() => alerts.find((a) => a.status === 'ACTIVE'), [alerts]);
+
+  // Listen for automatic SOS events from the backend. This updates the SOS
+  // center immediately; the browser page itself is never reloaded.
+  useEffect(() => {
+    if (!activeJourney?.id) return;
+
+    const unsubscribe = socketService.subscribe<AlertMessage>(
+      wsTopics.alert(activeJourney.id),
+      (message) => {
+        if (message.status !== 'ACTIVE') return;
+
+        setCoords([message.latitude, message.longitude]);
+        toast.error('Automatic SOS triggered — SafeCircle detected a dangerous situation.');
+        refetch();
+      }
+    );
+
+    return unsubscribe;
+  }, [activeJourney?.id, refetch]);
 
   const getLocation = () =>
     new Promise<[number, number]>((resolve, reject) => {

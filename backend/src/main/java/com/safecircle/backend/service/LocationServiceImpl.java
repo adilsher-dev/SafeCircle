@@ -34,6 +34,7 @@ public class LocationServiceImpl implements LocationService {
     private final AIRiskPredictionService aiRiskPredictionService;
     private final NotificationService notificationService;
     private final AlertRepository alertRepository;
+    private final AlertService alertService;
     private final WebSocketService webSocketService;
     private final OpenStreetMapsService openStreetMapsService;
 
@@ -148,23 +149,61 @@ public class LocationServiceImpl implements LocationService {
             );
         }
 
-        if (routeDeviation || longStop || abnormalSpeed) {
+        // MEDIUM, HIGH and CRITICAL risk automatically trigger SOS.
+        // AlertService prevents duplicate active SOS alerts for the same journey.
+        boolean riskRequiresAutomaticSOS =
+                risk.getRiskLevel() == RiskLevel.MEDIUM
+                        || risk.getRiskLevel() == RiskLevel.HIGH
+                        || risk.getRiskLevel() == RiskLevel.CRITICAL;
 
-            Alert alert = Alert.builder()
-                    .user(user)
-                    .journey(journey)
-                    .alertType(AlertType.SOS)
-                    .status(AlertStatus.ACTIVE)
+        if (riskRequiresAutomaticSOS) {
+
+            RiskResponse automaticRiskResponse = RiskResponse.builder()
+                    .riskAssessmentId(risk.getRiskAssessmentId())
+                    .riskScore(risk.getRiskScore())
+                    .riskLevel(risk.getRiskLevel())
+                    .predictionReason(risk.getPredictionReason())
+                    .recommendation(risk.getRecommendation())
                     .latitude(saved.getLatitude())
                     .longitude(saved.getLongitude())
-                    .address(saved.getAddress())
-                    .batteryLevel(saved.getBatteryLevel())
-                    .message("Automatic SOS triggered.")
-                    .sirenActivated(false)
-                    .createdAt(LocalDateTime.now())
                     .build();
 
-            alertRepository.save(alert);
+            alertService.triggerAutomaticSOS(
+                    journey,
+                    saved,
+                    automaticRiskResponse
+            );
+        }
+
+        // Keep the existing abnormal-behaviour protection as a fallback.
+        // Do not create a second SOS when one is already active.
+        if (!riskRequiresAutomaticSOS
+                && (routeDeviation || longStop || abnormalSpeed)) {
+
+            boolean activeSOSExists = alertRepository
+                    .findFirstByJourneyAndStatusOrderByTriggeredAtDesc(
+                            journey,
+                            AlertStatus.ACTIVE
+                    )
+                    .isPresent();
+
+            if (!activeSOSExists) {
+                Alert alert = Alert.builder()
+                        .user(user)
+                        .journey(journey)
+                        .alertType(AlertType.SOS)
+                        .status(AlertStatus.ACTIVE)
+                        .latitude(saved.getLatitude())
+                        .longitude(saved.getLongitude())
+                        .address(saved.getAddress())
+                        .batteryLevel(saved.getBatteryLevel())
+                        .message("Automatic SOS triggered.")
+                        .sirenActivated(false)
+                        .triggeredAt(LocalDateTime.now())
+                        .build();
+
+                alertRepository.save(alert);
+            }
         }
 
         LiveLocationMessage message =

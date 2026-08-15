@@ -18,6 +18,11 @@ public interface AlertRepository extends JpaRepository<Alert, Long> {
 
     List<Alert> findByJourney(Journey journey);
 
+    Optional<Alert> findFirstByJourneyAndStatusOrderByTriggeredAtDesc(
+            Journey journey,
+            AlertStatus status
+    );
+
     List<Alert> findByStatus(AlertStatus status);
 
     long countByUser(User user);

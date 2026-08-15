@@ -213,15 +213,38 @@ public class AlertServiceImpl implements AlertService {
 
         User user = journey.getUser();
 
+        // Do not create another SOS if this journey already has an active one.
+        Alert existingActiveAlert = alertRepository
+                .findFirstByJourneyAndStatusOrderByTriggeredAtDesc(
+                        journey,
+                        AlertStatus.ACTIVE
+                )
+                .orElse(null);
+
+        if (existingActiveAlert != null) {
+            return ApiResponse.<AlertResponse>builder()
+                    .success(true)
+                    .message("An SOS is already active for this journey.")
+                    .data(AlertMapper.toResponse(existingActiveAlert))
+                    .build();
+        }
+
+        String riskLevel = riskResponse != null && riskResponse.getRiskLevel() != null
+                ? riskResponse.getRiskLevel().name()
+                : "UNKNOWN";
+
+        String message =
+                "Automatic SOS triggered because SafeCircle detected "
+                        + riskLevel
+                        + " risk.";
+
         Alert alert = Alert.builder()
                 .alertType(AlertType.SOS)
                 .status(AlertStatus.ACTIVE)
                 .latitude(location.getLatitude())
                 .longitude(location.getLongitude())
                 .address(location.getAddress())
-                .message(
-                        "Automatic SOS triggered because AI detected CRITICAL risk."
-                )
+                .message(message)
                 .batteryLevel(location.getBatteryLevel())
                 .sirenActivated(false)
                 .contactsNotified(false)
@@ -245,13 +268,12 @@ public class AlertServiceImpl implements AlertService {
                 .timestamp(saved.getTriggeredAt())
                 .build();
 
+        // Push the SOS immediately. The frontend updates without a page reload.
         webSocketService.sendAlert(socketMessage);
 
         Notification notification = Notification.builder()
                 .title("🚨 Automatic SOS")
-                .message(
-                        "SafeCircle automatically triggered SOS because AI detected CRITICAL danger."
-                )
+                .message(message)
                 .type(NotificationType.SOS_TRIGGERED.name())
                 .isRead(false)
                 .isSent(true)
